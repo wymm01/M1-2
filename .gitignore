@@ -1,0 +1,17 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+.env.*
+
+# Firebase credentials
+*.json
+!vercel.json
+!package.json
+
+# OS
+.DS_Store
+Thumbs.db
