@@ -1,74 +1,54 @@
-# -*- coding: utf-8 -*-
-# backend/seed_data.py
-import os
-import json
-import random
-from datetime import datetime, timedelta
+import requests
+from datetime import date, timedelta
 from firebase_config import get_firestore_client
 
-def generate_usd_krw_data(num_points=200):
-    """
-    미국 달러 환율(USD/KRW) 시계열 데이터 200개 생성
-    2024-01-01부터 시작하는 일별 데이터
-    """
-    data_points = []
-    
-    # 실제 환율과 유사한 시작값 설정
-    base_rate = 1320.0
-    current_rate = base_rate
-    start_date = datetime(2024, 1, 1)
-    
-    for i in range(num_points):
-        # 랜덤 변동폭 (-8 ~ +8원)
-        change = random.uniform(-8, 8)
-        # 트렌드 반영 (완만한 상승 후 하락)
-        if i < 100:
-            trend = 0.3
-        else:
-            trend = -0.2
-        
-        current_rate = round(current_rate + change + trend, 2)
-        # 현실적인 범위 유지 (1250 ~ 1450)
-        current_rate = max(1250.0, min(1450.0, current_rate))
-        
-        date = start_date + timedelta(days=i)
-        
-        data_points.append({
-            "date": date.strftime("%Y-%m-%d"),
-            "value": current_rate,
-            "memo": f"USD/KRW 환율 {date.strftime('%Y-%m-%d')}"
-        })
-    
-    return data_points
+COLLECTION = "data"
 
 
-def seed_firestore():
-    """Firestore의 data 컬렉션에 환율 데이터 200개 업로드"""
+def fetch_recent_rates(target_count: int = 200):
+    """최근 target_count 영업일치 USD->KRW 환율을 Frankfurter API에서 가져온다."""
+    end_date = date.today()
+    # 영업일만 오므로 여유있게 더 넉넉한 기간을 요청한다 (주말/공휴일 제외분 보정)
+    start_date = end_date - timedelta(days=int(target_count * 1.6) + 10)
+
+    url = f"https://api.frankfurter.app/{start_date}..{end_date}?from=USD&to=KRW"
+    res = requests.get(url, timeout=10)
+    res.raise_for_status()
+    rates = res.json()["rates"]  # {"2026-01-02": {"KRW": 1320.5}, ...}
+
+    sorted_dates = sorted(rates.keys())
+    recent_dates = sorted_dates[-target_count:]  # 최근 target_count개만 사용
+
+    return [
+        {"date": d, "value": round(rates[d]["KRW"], 2), "memo": None}
+        for d in recent_dates
+    ]
+
+
+def clear_collection(db):
+    """기존 data 컬렉션을 비운다 (2024년 샘플 데이터 제거)."""
+    docs = db.collection(COLLECTION).stream()
+    count = 0
+    for doc in docs:
+        doc.reference.delete()
+        count += 1
+    print(f"기존 데이터 {count}개 삭제 완료")
+
+
+def seed():
     db = get_firestore_client()
-    collection_ref = db.collection("data")
-    
-    # 기존 데이터 확인
-    existing = list(collection_ref.limit(1).stream())
-    if existing:
-        print("⚠️  이미 데이터가 존재합니다. 업로드를 건너뜁니다.")
-        print("   기존 데이터를 삭제하고 싶으면 Firestore 콘솔에서 직접 삭제하세요.")
-        return
-    
-    print("📊 환율 데이터 200개 생성 중...")
-    data_points = generate_usd_krw_data(200)
-    
-    print("🔥 Firestore에 업로드 중...")
-    for i, point in enumerate(data_points):
-        collection_ref.add(point)
-        if (i + 1) % 20 == 0:
-            print(f"   {i + 1}/200 완료...")
-    
-    print("✅ 200개 데이터 업로드 완료!")
-    
-    # 업로드 결과 확인
-    total = len(list(collection_ref.stream()))
-    print(f"📌 Firestore 'data' 컬렉션 총 문서 수: {total}개")
+
+    clear_collection(db)
+
+    items = fetch_recent_rates(200)
+    print(f"Frankfurter API에서 {len(items)}개 데이터 수신 완료")
+
+    for item in items:
+        db.collection(COLLECTION).add(item)
+
+    print(f"Firestore에 {len(items)}개 데이터 업로드 완료")
+    print(f"기간: {items[0]['date']} ~ {items[-1]['date']}")
 
 
 if __name__ == "__main__":
-    seed_firestore()
+    seed()
