@@ -6,8 +6,34 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 def get_firestore_client():
+    if not firebase_admin._apps:
+        service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
+
+        if not service_account_json:
+            raise ValueError("FIREBASE_SERVICE_ACCOUNT_JSON이 설정되지 않았습니다.")
+
+        stripped = service_account_json.strip()
+
+        if stripped.startswith("{"):
+            # ✅ 값 자체가 JSON 텍스트인 경우 (Render 배포 환경 등)
+            service_account_info = json.loads(stripped)
+            cred = credentials.Certificate(service_account_info)
+        else:
+            # ✅ 값이 파일 경로인 경우 (로컬 개발 환경)
+            path = service_account_json
+            if not os.path.isabs(path):
+                base_dir = os.path.dirname(os.path.abspath(__file__))  # backend 폴더
+                root_dir = os.path.dirname(base_dir)                   # 루트 폴더
+                filename = path.lstrip('./')
+                path = os.path.join(root_dir, filename)
+            cred = credentials.Certificate(path)
+
+        firebase_admin.initialize_app(cred)
+
+    return firestore.client()
+
+"""def get_firestore_client():
     if not firebase_admin._apps:
         service_account_json = os.getenv("FIREBASE_SERVICE_ACCOUNT_JSON")
 
@@ -33,4 +59,4 @@ def get_firestore_client():
 
         firebase_admin.initialize_app(cred)
 
-    return firestore.client()
+    return firestore.client()"""
