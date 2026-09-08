@@ -28,7 +28,7 @@ def create_data(item: ExchangeRateItem):
 # ✅ 2. 전체 데이터 조회
 @router.get("/")
 def get_all_data():
-    docs = db.collection(COLLECTION).stream()
+    docs = db.collection(COLLECTION).order_by("date").stream()
     result = [{"id": doc.id, **doc.to_dict()} for doc in docs]
     return {"count": len(result), "data": result}
 
