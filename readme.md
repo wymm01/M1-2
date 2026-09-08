@@ -81,10 +81,10 @@ const API_BASE_URL = "https://m1-2-jmkr.onrender.com";
 ## 📸 제출 스크린샷
 
 ### 데이터 요약이 보이는 채팅 화면 (질문+답변 포함)
-[스크린샷 삽입]
+ ![데이터 요약이 보이는 채팅 화면](screenshots/M1-2chat.png)
 
 ### 데이터 관리 화면 (추가/삭제 동작)
-[스크린샷 삽입]
+ ![데이터 관리 화면](screenshots/M1-2data.png)
 
 ### 대화 기록 화면 (불러오기 동작)
-[스크린샷 삽입]
+ ![대화 기록 화면](screenshots/M1-2history.png)
